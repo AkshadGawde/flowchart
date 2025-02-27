@@ -1,4 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from "react";
+import { applyNodeChanges, applyEdgeChanges } from "reactflow";
+
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -71,8 +73,8 @@ const imageWidth = 1024;
 const imageHeight = 768;
 const Content = () => {
   const { isSidebarOpen, closeSidebar } = useGlobalContext();
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes,] = useNodesState([]);
+  const [edges, setEdges,] = useEdgesState([]);
   
   const [nodeName, setNodeName] = useState();
   const [nodeId, setNodeId] = useState();
@@ -115,7 +117,51 @@ const Content = () => {
   };
  
 
-
+  const onNodesChange = useCallback((changes) => {
+    saveToHistory(); // Save state before changing nodes
+    setNodes((prevNodes) => applyNodeChanges(changes, prevNodes));
+  }, [setNodes]);
+  const onEdgesChange = useCallback((changes) => {
+    saveToHistory(); // Save state before changing edges
+    setEdges((prevEdges) => applyEdgeChanges(changes, prevEdges));
+  }, [setEdges]);
+    
+  const undo = () => {
+    if (history.length === 0) return; // Nothing to undo
+  
+    const lastState = history[history.length - 1]; // Get last saved state
+    setFuture((prevFuture) => [{ nodes, edges }, ...prevFuture]); // Save current state for redo
+    setNodes(lastState.nodes); // Restore nodes
+    setEdges(lastState.edges); // Restore edges
+    setHistory((prevHistory) => prevHistory.slice(0, -1)); // Remove last history item
+  };
+  
+  const redo = () => {
+    if (future.length === 0) return; // Nothing to redo
+  
+    const nextState = future[0]; // Get next saved state
+    setHistory((prevHistory) => [...prevHistory, { nodes, edges }]); // Save current state for undo
+    setNodes(nextState.nodes); // Restore nodes
+    setEdges(nextState.edges); // Restore edges
+    setFuture((prevFuture) => prevFuture.slice(1)); // Remove first redo item
+  };
+  
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.ctrlKey && event.key === "z") {
+        event.preventDefault();
+        undo();
+      }
+      if (event.ctrlKey && event.key === "y") {
+        event.preventDefault();
+        redo();
+      }
+    };
+  
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
+  
   
   const [id, setId] = useState(0);
 
@@ -372,14 +418,24 @@ const Content = () => {
   const [newEdge, setNewEdge] = useState(null); // Store pending edge
   const [relationship, setRelationship] = useState("depends on"); // Selected relationship
   const [isModalOpen, setIsModalOpen] = useState(false); // Control modal visibility
-  
+  const [history, setHistory] = useState([]); // Stack for undo
+const [future, setFuture] = useState([]); // Stack for redo
+
 
 const onConnect = useCallback((params) => {
+  saveToHistory();
   setNewEdge(params);  // Store edge temporarily
   setIsModalOpen(true); // Open the relationship selection modal
 }, []);
 
-    
+const saveToHistory = () => {
+  setHistory((prevHistory) => [
+    ...prevHistory,
+    { nodes: [...nodes], edges: [...edges] },
+  ]);
+  setFuture([]); // Clear redo history on new action
+};
+
 
   return (
 
@@ -423,6 +479,22 @@ const onConnect = useCallback((params) => {
               Flow <span className="-ml-1 text-pink-500 ">Chart</span>
             </h2> */}
           </div>
+          <div className="flex space-x-2 p-4">
+
+            {/* undo */}
+            <button 
+    className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800 transition"
+    onClick={undo}
+  >
+    ⮌ Undo
+  </button>
+  <button 
+    className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800 transition"
+    onClick={redo}
+  >
+    ⮊ Redo
+  </button>
+</div>
           <hr className="my-0 mt-[0.20rem]" />
           <div className="flex flex-col justify-between flex-1 mt-3">
             <div className="flex flex-col justify-start space-y-5 h-[calc(100vh-135px)]">
@@ -566,6 +638,8 @@ const onConnect = useCallback((params) => {
           </div>
         </div>
       </div>
+    
+
       <Controls />
       <MiniMap zoomable pannable />
       <Background variant="dots" gap={12} size={1} />
