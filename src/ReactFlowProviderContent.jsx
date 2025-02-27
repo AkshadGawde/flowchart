@@ -21,42 +21,85 @@ import { BiSolidDockLeft } from "react-icons/bi";
 import { FaHeart } from "react-icons/fa";
 import { useGlobalContext } from "./context";
 import "reactflow/dist/style.css";
+import defaultJsonData from "./test";
 
-const defaultJsonData = {
-  steps: [
-    {
-      id: "step-1",
-      name: "Step 1",
-      nodes: [
-        {
-          id: "node-1",
-          label: "Start Node",
-          subNodes: [
-            { id: "subnode-1", label: "Sub Node A", parentId: "node-1" },
-            { id: "subnode-2", label: "Sub Node B", parentId: "node-1" }
-          ]
-        },
-        { id: "node-2", label: "Process Node", subNodes: [] }
-      ]
-    },
-    {
-      id: "step-2",
-      name: "Step 2",
-      nodes: [
-        {
-          id: "node-3",
-          label: "Decision Node",
-          subNodes: []
-        }
-      ]
-    }
-  ],
-  edges: [
-    { source: "node-1", target: "node-2", relationship: "leads to" },
-    { source: "node-2", target: "node-3", relationship: "proceeds to" },
-    { source: "subnode-1", target: "node-3", relationship: "optional path" }
-  ]
-};
+// const defaultJsonData = {
+//   "steps": [
+//     {
+//       "id": "step-1",
+//       "name": "Step 1",
+//       "nodes": [
+//         {
+//           "id": "node-1",
+//           "label": "Start Node",
+//           "position": {
+//             "x": 0,
+//             "y": 0
+//           }
+//         },
+//         {
+//           "id": "subnode-1",
+//           "label": "Sub Node A",
+//           "position": {
+//             "x": 100,
+//             "y": 100
+//           }
+//         },
+//         {
+//           "id": "subnode-2",
+//           "label": "Sub Node B",
+//           "position": {
+//             "x": 100,
+//             "y": 200
+//           }
+//         },
+//         {
+//           "id": "node-2",
+//           "label": "Process Node",
+//           "position": {
+//             "x": 0,
+//             "y": 150
+//           }
+//         },
+//         {
+//           "id": "node-3",
+//           "label": "Decision Node",
+//           "position": {
+//             "x": 300,
+//             "y": 0
+//           }
+//         }
+//       ]
+//     }
+//   ],
+//   "edges": [
+//     {
+//       "source": "node-1",
+//       "target": "subnode-1",
+//       "relationship": "default"
+//     },
+//     {
+//       "source": "node-1",
+//       "target": "subnode-2",
+//       "relationship": "default"
+//     },
+//     {
+//       "source": "node-1",
+//       "target": "node-2",
+//       "relationship": "default"
+//     },
+//     {
+//       "source": "node-2",
+//       "target": "node-3",
+//       "relationship": "default"
+//     },
+//     {
+//       "source": "subnode-1",
+//       "target": "node-3",
+//       "relationship": "default"
+//     }
+//   ]
+// };
 
 
 
@@ -157,7 +200,9 @@ const Content = () => {
         redo();
       }
     };
-  
+
+
+
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
@@ -296,10 +341,7 @@ const Content = () => {
     setEdges(loadedEdges);
   };
   
-  useEffect(() => {
-    processJSONData(defaultJsonData);
-  }, []);
-  
+
   
   
   const handleFileUpload = (event) => {
@@ -437,6 +479,73 @@ const saveToHistory = () => {
 };
 
 
+const exportFlowchart = () => {
+  const flowData = {
+    steps: [
+      {
+        id: "step-1",
+        name: "Step 1",
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          label: node.data.label,
+          position: node.position,
+        })),
+      },
+    ],
+    edges: edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      relationship: edge.label || "default",
+    })),
+  };
+
+  const jsonString = JSON.stringify(flowData, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "flowchart.json";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+
+const importFlowchart = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const flowData = JSON.parse(e.target.result);
+
+      const loadedNodes = (flowData.steps || []).flatMap((step) =>
+        (step.nodes || []).map((node) => ({
+          id: node.id,
+          data: { label: node.label },
+          position: node.position || { x: 0, y: 0 },
+        }))
+      );
+
+      const loadedEdges = (flowData.edges || []).map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        animated: true,
+        label: edge.relationship || "default",
+      }));
+
+      setNodes(loadedNodes);
+      setEdges(loadedEdges);
+    } catch (error) {
+      alert("Invalid JSON file.");
+      console.error("Error parsing JSON:", error);
+    }
+  };
+
+  reader.readAsText(file);
+};
+
+
   return (
 
     <div style={{ width: "100vw", height: "100vh" }}>
@@ -461,183 +570,64 @@ const saveToHistory = () => {
       
 
       {/* sidebar */}
-      <div
-        className={`transition-all  duration-500  fixed top-0 ${
-          isSidebarOpen ? "left-0" : "-left-64"
-        }`}
-      >
-        <div className="relative flex flex-col w-64 h-screen min-h-screen px-4 py-8 overflow-y-auto bg-white border-r">
-          <div className="">
-            <button
-              onClick={closeSidebar}
-              className="absolute flex items-center justify-center w-8 h-8 ml-6 text-gray-600 rounded-full top-1 right-1 active:bg-gray-300 focus:outline-none hover:bg-gray-200 hover:text-gray-800"
-            >
-              {/* <HiX className="w-5 h-5" /> */}
-              <BiSolidDockLeft className="w-5 h-5" />
-            </button>
-            {/* <h2 className="text-3xl font-semibold text-gray-700 ">
-              Flow <span className="-ml-1 text-pink-500 ">Chart</span>
-            </h2> */}
-          </div>
-          <div className="flex space-x-2 p-4">
-
-            {/* undo */}
-            <button 
-    className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800 transition"
-    onClick={undo}
-  >
-    ⮌ Undo
-  </button>
-  <button 
-    className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800 transition"
-    onClick={redo}
-  >
-    ⮊ Redo
-  </button>
-</div>
-          <hr className="my-0 mt-[0.20rem]" />
-          <div className="flex flex-col justify-between flex-1 mt-3">
-            <div className="flex flex-col justify-start space-y-5 h-[calc(100vh-135px)]">
-              {/* Create Node Section */}
-              <div className="flex flex-col space-y-3 ">
-                <div className="mt-3 text-lg font-bold text-black">
-                  Create Node
-                </div>
-                <div className="flex flex-col space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    className="p-[1px] border pl-1 "
-                    onChange={(e) =>
-                      setNewNodeInput((prev) => ({
-                        ...prev,
-                        name: e.target.value,
-                      }))
-                    }
-                    value={newNodeInput.name}
-                  />
-                  <div className="flex flex-row gap-x-2">
-                    <label className="font-semibold ">Color:</label>
-                    <input
-                      type="color"
-                      placeholder="Color"
-                      className="p-[1px] border pl-1"
-                      onChange={(e) =>
-                        setNewNodeInput((prev) => ({
-                          ...prev,
-                          color: e.target.value,
-                        }))
-                      }
-                      value={newNodeInput.color}
-                    />
-                  </div>
-                  <button
-                    className="p-[4px]  text-white bg-slate-700 hover:bg-slate-800 active:bg-slate-900 rounded"
-                    onClick={handleCreateNode}
-                  >
-                    Create
-                  </button>
-                </div>
-              </div>
-              <hr className="my-2" />
-              <div className="flex flex-col space-y-3">
-  <div className="text-lg font-bold text-black">Upload JSON</div>
-  <input
-    type="file"
-    accept=".json"
-    onChange={handleFileUpload}
-    className="p-[4px] border"
-  />
+     <div className={`transition-all duration-500 fixed top-0 ${isSidebarOpen ? "left-0" : "-left-64"}`}> 
+  <div className="relative flex flex-col w-64 h-screen min-h-screen px-4 py-8 overflow-y-auto bg-white border-r shadow-md"> 
+    <button onClick={closeSidebar} className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"> 
+      <BiSolidDockLeft className="w-5 h-5" /> 
+    </button> 
+    
+    <h2 className="text-2xl font-semibold text-gray-700 mb-4">Actions</h2> 
+    
+    {/* Undo/Redo Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Edit</h3> 
+      <div className="flex space-x-2 mt-2"> 
+        <button className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800" onClick={undo}>⮌ Undo</button> 
+        <button className="px-3 py-1 bg-gray-700 text-white text-sm rounded shadow hover:bg-gray-800" onClick={redo}>⮊ Redo</button> 
+      </div> 
+    </div> 
+    
+    {/* Create Node Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Create Node</h3> 
+      <input type="text" placeholder="Name" className="p-2 border w-full rounded mt-2" onChange={(e) => setNewNodeInput((prev) => ({ ...prev, name: e.target.value }))} value={newNodeInput.name} /> 
+      <button className="w-full p-2 mt-2 bg-blue-600 text-white rounded hover:bg-blue-700" onClick={handleCreateNode}>Create</button> 
+    </div> 
+    
+    {/* Upload JSON Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Upload JSON</h3> 
+      <label className="block w-full p-2 bg-purple-600 text-white rounded text-center hover:bg-purple-700 cursor-pointer mt-2">⬆ Import 
+        <input type="file" accept=".json" onChange={importFlowchart} className="hidden" /> 
+      </label> 
+    </div> 
+    
+    {/* Update Node Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Update Node</h3> 
+      <input type="text" name="name" placeholder="Name" value={nodeName} onChange={handleUpdateNode} className="p-2 border w-full rounded mt-2" /> 
+    </div> 
+    
+    {/* Save/Restore Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Save & Restore</h3> 
+      <div className="flex space-x-2 mt-2"> 
+        <button className="flex-1 p-2 bg-slate-700 text-white rounded hover:bg-slate-800" onClick={onSave}>Save</button> 
+        <button className="flex-1 p-2 bg-slate-700 text-white rounded hover:bg-slate-800" onClick={onRestore}>Restore</button> 
+      </div> 
+    </div> 
+    
+    {/* Export/Download Section */} 
+    <div className="mb-4"> 
+      <h3 className="text-lg font-bold">Export & Download</h3> 
+      <div className="flex space-x-2 mt-2"> 
+        <button className="flex-1 p-2 bg-yellow-600 text-white rounded hover:bg-yellow-700" onClick={exportFlowchart}>⬇ Export</button> 
+        <button className="flex-1 p-2 bg-slate-700 text-white rounded hover:bg-slate-800" onClick={onClick}>Download</button> 
+      </div> 
+    </div> 
+  </div> 
 </div>
 
-
- 
-              {/* Update Node Section */}
-              <div className="flex flex-col space-y-3">
-                <div className="text-lg font-bold text-black">Update Node</div>
-                <div className="flex flex-col space-y-3">
-                  <input
-                    type="text"
-                    name="name"
-                    placeholder="Name"
-                    value={nodeName}
-                    onChange={handleUpdateNode}
-                    className="p-[1px] border pl-1 "
-                  />
-                  <div className="flex flex-row gap-x-5">
-                    <div className="flex flex-row gap-x-2">
-                      <label className="font-semibold ">Color:</label>
-                      <input
-                        type="color"
-                        placeholder="bgColor"
-                        name="background"
-                        value={nodeColor}
-                        onChange={handleUpdateNode}
-                        className="p-[1px] border pl-1"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <hr className="my-0" />
-              {/* Drag and Drop Section */}
-              <div className="flex flex-col space-y-3">
-                <div className="text-lg font-bold text-black">
-                  Drag and Drop
-                </div>
-                <div className="flex flex-col p-1 space-y-3 rounded outline outline-2">
-                  <div
-                    className="font-medium text-center rounded cursor-grab"
-                    onDragStart={(event) => onDragStart(event, "default")}
-                    draggable
-                  >
-                    Default Node
-                  </div>
-                </div>
-              </div>
-              <hr className="my-0" />
-              {/* Save and Restore Buttons */}
-              <div className="flex flex-col space-y-3">
-                <div className="text-lg font-bold text-black">Controls</div>
-                <div className="flex flex-row space-x-3">
-                  <button
-                    className="flex-1 p-2 text-sm text-white transition duration-300 ease-in-out rounded bg-slate-700 hover:bg-slate-800 active:bg-slate-900"
-                    onClick={onSave}
-                  >
-                    Save
-                  </button>
-                  <button
-                    className="flex-1 p-2 text-sm text-white rounded bg-slate-700 hover:bg-slate-800 active:bg-slate-900"
-                    onClick={onRestore}
-                  >
-                    Restore{" "}
-                  </button>
-                  <button
-                    className="flex-1 p-2 text-sm text-white rounded bg-slate-700 hover:bg-slate-800 active:bg-slate-900"
-                    onClick={onClick}
-                  >
-                    Download{" "}
-                  </button>
-                </div>
-              </div>
-              <hr className="my-0" />
-              {/* <div className="flex justify-center px-4 pb-2 mt-auto -mx-4 bottom-3">
-                <h4 className=" text-[12px] font-semibold text-gray-600 ">
-                  Made with <FaHeart className="inline-block " /> by{" "}
-                  <a
-                    target="_blank"
-                    rel="noreferrer"
-                    href="https://www.linkedin.com/in/Akshad-gawde"
-                    className="cursor-pointer hover:underline hover:text-blue-500"
-                  >
-                    Akshad Gawde.
-                  </a>
-                </h4>
-              </div> */}
-            </div>
-          </div>
-        </div>
-      </div>
     
 
       <Controls />
