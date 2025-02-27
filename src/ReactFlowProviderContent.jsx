@@ -113,10 +113,10 @@ const Content = () => {
       },
     }).then(downloadImage);
   };
-  const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
+ 
+
+
+  
   const [id, setId] = useState(0);
 
   const getId = useCallback(() => {
@@ -368,7 +368,22 @@ const Content = () => {
     restoreFlow();
   }, [setNodes, setViewport, setEdges]);
 
+
+  const [newEdge, setNewEdge] = useState(null); // Store pending edge
+  const [relationship, setRelationship] = useState("depends on"); // Selected relationship
+  const [isModalOpen, setIsModalOpen] = useState(false); // Control modal visibility
+  
+
+const onConnect = useCallback((params) => {
+  setNewEdge(params);  // Store edge temporarily
+  setIsModalOpen(true); // Open the relationship selection modal
+}, []);
+
+    
+
   return (
+
+    <div style={{ width: "100vw", height: "100vh" }}>
     <ReactFlow
       ref={ref}
       nodes={nodes}
@@ -386,6 +401,9 @@ const Content = () => {
       onPaneClick={onPaneClick}
       onNodeContextMenu={onNodeContextMenu}
     >
+      
+      
+
       {/* sidebar */}
       <div
         className={`transition-all  duration-500  fixed top-0 ${
@@ -460,6 +478,8 @@ const Content = () => {
   />
 </div>
 
+
+ 
               {/* Update Node Section */}
               <div className="flex flex-col space-y-3">
                 <div className="text-lg font-bold text-black">Update Node</div>
@@ -552,6 +572,59 @@ const Content = () => {
       {/* context menu */}
       {menu && <ContextMenu onClick={onPaneClick} {...menu} />}
     </ReactFlow>
+    {/* Modal should be OUTSIDE ReactFlow */}
+    {isModalOpen && (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 pointer-events-auto">
+        <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-center">
+          <h2 className="text-lg font-bold mb-4">Select Relationship Type</h2>
+
+          <select
+            value={relationship}
+            onChange={(e) => setRelationship(e.target.value)}
+            className="p-2 border rounded w-full"
+          >
+            <option value="depends on">Depends On</option>
+            <option value="related to">Related To</option>
+            <option value="leads to">Leads To</option>
+            <option value="proceeds to">Proceeds To</option>
+          </select>
+
+          <div className="flex justify-center mt-4 space-x-3">
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              onClick={() => {
+                setEdges((prevEdges) => [
+                  ...prevEdges,
+                  {
+                    id: `${newEdge.source}-${newEdge.target}`,
+                    source: newEdge.source,
+                    target: newEdge.target,
+                    animated: true,
+                    label: relationship, // Store selected relationship label
+                  },
+                ]);
+                setIsModalOpen(false); // Close the modal
+                setNewEdge(null); // Reset new edge
+              }}
+            >
+              Confirm
+            </button>
+
+            <button
+              className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+              onClick={() => {
+                setIsModalOpen(false); // Close the modal without adding the edge
+                setNewEdge(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    </div>
   );
 };
 
