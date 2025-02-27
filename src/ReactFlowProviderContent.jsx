@@ -203,7 +203,7 @@ const Content = () => {
     setSelectedElements([node]);
     setNodeName(node.data.label);
     setNodeId(node.id);
-    setNodeColor(node.style.background);
+    // setNodeColor(node.style.background);
   }, []);
   const onEdgeUpdateStart = useCallback(() => {
     edgeUpdateSuccessful.current = false;
