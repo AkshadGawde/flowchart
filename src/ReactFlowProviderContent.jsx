@@ -248,8 +248,9 @@ const Content = () => {
     setSelectedElements([node]);
     setNodeName(node.data.label);
     setNodeId(node.id);
-    // setNodeColor(node.style.background);
+    setNodeColor(node.style?.background || "#ffffff"); // Prevents crash if style is missing
   }, []);
+  
   const onEdgeUpdateStart = useCallback(() => {
     edgeUpdateSuccessful.current = false;
   }, []);
@@ -257,10 +258,16 @@ const Content = () => {
   const onEdgeUpdate = useCallback(
     (oldEdge, newConnection) => {
       edgeUpdateSuccessful.current = true;
-      setEdges((els) => updateEdge(oldEdge, newConnection, els));
+      setEdges((els) =>
+        updateEdge(oldEdge, newConnection, els.map(edge => ({
+          ...edge,
+          animated: edge.id === newConnection.id ? true : edge.animated,
+        })))
+      );
     },
     [setEdges]
   );
+  
 
   const onEdgeUpdateEnd = useCallback(
     (_, edge) => {
@@ -295,8 +302,8 @@ const Content = () => {
   const processJSONData = (jsonData) => {
     const loadedNodes = [];
     const loadedEdges = [];
-    const stepSpacing = 300; // Horizontal space between steps
-    const nodeSpacing = 150; // Vertical space between nodes
+    const stepSpacing = 400; // Increased horizontal space
+    const nodeSpacing = 200; // Increased vertical space
     let stepIndex = 0;
   
     jsonData.steps.forEach((step) => {
@@ -311,10 +318,10 @@ const Content = () => {
           position: parentPosition ?? { x: 0, y: 0 },
         });
   
-        node.subNodes.forEach((subNode, subIndex) => {
+        node.subNodes?.forEach((subNode, subIndex) => {
           const subNodePosition = {
-            x: parentPosition.x + 100,
-            y: parentPosition.y + (subIndex + 1) * 100,
+            x: parentPosition.x + 150, // Shift subnodes to the right
+            y: parentPosition.y + (subIndex + 1) * 150, // More spacing
           };
   
           loadedNodes.push({
@@ -340,6 +347,7 @@ const Content = () => {
     setNodes(loadedNodes);
     setEdges(loadedEdges);
   };
+  
   
 
   
@@ -367,13 +375,7 @@ const Content = () => {
 
   const handleUpdateNode = (event) => {
     const { name, value } = event.target;
-
-    // Update the corresponding state based on the input name
-
-    if (name === "name") setNodeName(value);
-    else if (name === "background") setNodeColor(value.background);
-
-    // Find the selected node and update its data
+  
     setNodes((prevNodes) =>
       prevNodes.map((n) =>
         n.id === nodeId
@@ -382,13 +384,17 @@ const Content = () => {
               data: { ...n.data, [name]: value },
               style: {
                 ...n.style,
-                [name]: value,
+                background: name === "background" ? value : n.style?.background,
               },
             }
           : n
       )
     );
+  
+    if (name === "name") setNodeName(value);
+    if (name === "background") setNodeColor(value);
   };
+  
 
   const onDragStart = (event, nodeType) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
@@ -434,28 +440,90 @@ const Content = () => {
   );
 
   const flowKey = "example-flow";
+
+  const defaultFlowchart = {
+    nodes: [
+      {
+        id: "node-1",
+        data: { label: "Welcome" },
+        position: { x: 100, y: 100 }
+      },
+      {
+        id: "node-2",
+        data: { label: "This is a preloded nodes" },
+        position: { x: 300, y: 100 }
+      }
+    ],
+    edges: [
+      { source: "node-1", target: "node-2", animated: true }
+    ]
+  };
+  
   const onSave = useCallback(() => {
     if (reactFlowInstance) {
       const flow = reactFlowInstance.toObject();
       localStorage.setItem(flowKey, JSON.stringify(flow));
+      alert("Flowchart saved successfully!");
     }
   }, [reactFlowInstance]);
-
+  
   const onRestore = useCallback(() => {
     const restoreFlow = async () => {
-      const flow = JSON.parse(localStorage.getItem(flowKey));
-
-      if (flow) {
-        const { x = 0, y = 0, zoom = 1 } = flow.viewport;
+      const savedFlow = localStorage.getItem(flowKey);
+      
+      if (!savedFlow) {
+        alert("No saved flowchart found. Loading tutorial...");
+        setNodes(defaultFlowchart.nodes);
+        setEdges(defaultFlowchart.edges);
+        return;
+      }
+      
+      try {
+        const flow = JSON.parse(savedFlow);
+        const { x = 0, y = 0, zoom = 1 } = flow.viewport || {};
+        
         setNodes(flow.nodes || []);
         setEdges(flow.edges || []);
         setViewport({ x, y, zoom });
+        alert("Flowchart restored successfully!");
+      } catch (error) {
+        console.error("Error restoring flowchart:", error);
+        alert("Failed to restore flowchart. Data might be corrupted.");
       }
     };
-
+  
     restoreFlow();
   }, [setNodes, setViewport, setEdges]);
+  
+  useEffect(() => {
+    const savedFlow = localStorage.getItem(flowKey);
+    if (savedFlow) {
+      const flow = JSON.parse(savedFlow);
+      setNodes(flow.nodes || []);
+      setEdges(flow.edges || []);
+      setViewport(flow.viewport || { x: 0, y: 0, zoom: 1 });
+    } else {
+     
+      setNodes(defaultFlowchart.nodes);
+      setEdges(defaultFlowchart.edges);
+    }
+  }, []);
+  const onClear = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    localStorage.removeItem(flowKey);
+    alert("Flowchart cleared!");
+  }, [setNodes, setEdges]);
 
+useEffect(() => {
+  const savedFlow = localStorage.getItem(flowKey);
+  if (savedFlow) {
+    const flow = JSON.parse(savedFlow);
+    setNodes(flow.nodes || []);
+    setEdges(flow.edges || []);
+    setViewport(flow.viewport || { x: 0, y: 0, zoom: 1 });
+  }
+}, []); // Runs once when the component mounts
 
   const [newEdge, setNewEdge] = useState(null); // Store pending edge
   const [relationship, setRelationship] = useState("depends on"); // Selected relationship
@@ -623,7 +691,11 @@ const importFlowchart = (event) => {
       <div className="flex space-x-2 mt-2"> 
         <button className="flex-1 p-2 bg-yellow-600 text-white rounded hover:bg-yellow-700" onClick={exportFlowchart}>⬇ Export</button> 
         <button className="flex-1 p-2 bg-slate-700 text-white rounded hover:bg-slate-800" onClick={onClick}>Download</button> 
-      </div> 
+      </div>
+      <div className="mb-4">
+              <h3 className="text-lg font-bold">Clear Flowchart</h3>
+              <button className="w-full p-2 bg-red-600 text-white rounded hover:bg-red-700" onClick={onClear}>Clear Screen</button>
+            </div> 
     </div> 
   </div> 
 </div>
