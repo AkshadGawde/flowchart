@@ -1,0 +1,40 @@
+{
+    "steps": [
+      {
+        "id": "step-1",
+        "name": "Step 1",
+        "nodes": [
+          {
+            "id": "node-1",
+            "label": "Start Node",
+            "subNodes": [
+              { "id": "subnode-1", "label": "Sub Node A", "parentId": "node-1" },
+              { "id": "subnode-2", "label": "Sub Node B", "parentId": "node-1" }
+            ]
+          },
+          {
+            "id": "node-2",
+            "label": "Process Node",
+            "subNodes": []
+          }
+        ]
+      },
+      {
+        "id": "step-2",
+        "name": "Step 2",
+        "nodes": [
+          {
+            "id": "node-3",
+            "label": "Decision Node",
+            "subNodes": []
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "source": "node-1", "target": "node-2", "relationship": "leads to" },
+      { "source": "node-2", "target": "node-3", "relationship": "proceeds to" },
+      { "source": "subnode-1", "target": "node-3", "relationship": "optional path" }
+    ]
+  }
+  

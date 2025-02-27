@@ -20,25 +20,45 @@ import { FaHeart } from "react-icons/fa";
 import { useGlobalContext } from "./context";
 import "reactflow/dist/style.css";
 
-const initialNodes = [
-  {
-    id: "1",
-    position: { x: 500, y: 100 },
-    data: { label: "Double click to open context menu" },
-    style: {
-      background: "#98FB98",
+const defaultJsonData = {
+  steps: [
+    {
+      id: "step-1",
+      name: "Step 1",
+      nodes: [
+        {
+          id: "node-1",
+          label: "Start Node",
+          subNodes: [
+            { id: "subnode-1", label: "Sub Node A", parentId: "node-1" },
+            { id: "subnode-2", label: "Sub Node B", parentId: "node-1" }
+          ]
+        },
+        { id: "node-2", label: "Process Node", subNodes: [] }
+      ]
     },
-  },
-  {
-    id: "2",
-    position: { x: 500, y: 200 },
-    data: { label: "Click to update" },
-    style: {
-      background: "#AFEEEE",
-    },
-  },
-];
-const initialEdges = [{ id: "e1-2", source: "1", target: "2" }];
+    {
+      id: "step-2",
+      name: "Step 2",
+      nodes: [
+        {
+          id: "node-3",
+          label: "Decision Node",
+          subNodes: []
+        }
+      ]
+    }
+  ],
+  edges: [
+    { source: "node-1", target: "node-2", relationship: "leads to" },
+    { source: "node-2", target: "node-3", relationship: "proceeds to" },
+    { source: "subnode-1", target: "node-3", relationship: "optional path" }
+  ]
+};
+
+
+
+
 
 function downloadImage(dataUrl) {
   const a = document.createElement("a");
@@ -51,8 +71,9 @@ const imageWidth = 1024;
 const imageHeight = 768;
 const Content = () => {
   const { isSidebarOpen, closeSidebar } = useGlobalContext();
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
   const [nodeName, setNodeName] = useState();
   const [nodeId, setNodeId] = useState();
   const [nodeColor, setNodeColor] = useState("#ffffff");
@@ -160,6 +181,7 @@ const Content = () => {
     },
     [setEdges]
   );
+  
 
   const handleCreateNode = () => {
     const newNode = {
@@ -177,28 +199,83 @@ const Content = () => {
     setNodes((prevNodes) => [...prevNodes, newNode]);
     setNewNodeInput({ id: "", name: "", color: "#ffffff" });
   };
+
+
+  const processJSONData = (jsonData) => {
+    const loadedNodes = [];
+    const loadedEdges = [];
+    const stepSpacing = 300; // Horizontal space between steps
+    const nodeSpacing = 150; // Vertical space between nodes
+    let stepIndex = 0;
+  
+    jsonData.steps.forEach((step) => {
+      let nodeIndex = 0;
+  
+      step.nodes.forEach((node) => {
+        const parentPosition = { x: stepIndex * stepSpacing, y: nodeIndex * nodeSpacing };
+  
+        loadedNodes.push({
+          id: node.id,
+          data: { label: node.label },
+          position: parentPosition ?? { x: 0, y: 0 },
+        });
+  
+        node.subNodes.forEach((subNode, subIndex) => {
+          const subNodePosition = {
+            x: parentPosition.x + 100,
+            y: parentPosition.y + (subIndex + 1) * 100,
+          };
+  
+          loadedNodes.push({
+            id: subNode.id,
+            data: { label: subNode.label },
+            position: subNodePosition ?? { x: 0, y: 0 },
+            parentId: node.id,
+          });
+  
+          loadedEdges.push({ source: node.id, target: subNode.id, animated: true });
+        });
+  
+        nodeIndex++;
+      });
+  
+      stepIndex++;
+    });
+  
+    jsonData.edges.forEach((edge) => {
+      loadedEdges.push({ source: edge.source, target: edge.target, animated: true });
+    });
+  
+    setNodes(loadedNodes);
+    setEdges(loadedEdges);
+  };
+  
   useEffect(() => {
-    if (selectedElements.length > 0) {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === selectedElements[0]?.id) {
-            node.data = {
-              ...node.data,
-              label: nodeName,
-            };
-            node.style = {
-              ...node.style,
-              background: nodeColor,
-            };
-          }
-          return node;
-        })
-      );
-    } else {
-      setNodeName(""); // Clear nodeName when no node is selected
-      setNodeColor("#ffffff");
-    }
-  }, [nodeName, nodeColor, selectedElements, setNodes]);
+    processJSONData(defaultJsonData);
+  }, []);
+  
+  
+  
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+  
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target.result);
+        processJSONData(jsonData); // Load new JSON file
+      } catch (error) {
+        console.error("Invalid JSON file:", error);
+        alert("Invalid JSON format. Please upload a valid JSON file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  
+  
+  
 
   const handleUpdateNode = (event) => {
     const { name, value } = event.target;
@@ -373,6 +450,16 @@ const Content = () => {
                 </div>
               </div>
               <hr className="my-2" />
+              <div className="flex flex-col space-y-3">
+  <div className="text-lg font-bold text-black">Upload JSON</div>
+  <input
+    type="file"
+    accept=".json"
+    onChange={handleFileUpload}
+    className="p-[4px] border"
+  />
+</div>
+
               {/* Update Node Section */}
               <div className="flex flex-col space-y-3">
                 <div className="text-lg font-bold text-black">Update Node</div>
